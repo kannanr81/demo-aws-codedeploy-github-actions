@@ -1,0 +1,31 @@
+name: Multi-Region EKS Deployment
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials (us-east-1)
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::645968351433:role/GitHubOIDCRole
+          aws-region: us-east-1
+
+      - name: Trigger CodePipeline (us-east-1)
+        run: |
+          aws codepipeline start-pipeline-execution \
+            --name pipeline-EKS-deployment \
+            --region us-east-1
+
