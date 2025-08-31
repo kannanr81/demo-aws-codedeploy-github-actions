@@ -10,8 +10,6 @@ env:
 
 phases:
   install:
-    runtime-versions:
-      docker: 20
     commands:
       - echo "Installing Helm..."
       - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
@@ -22,8 +20,8 @@ phases:
     commands:
       - echo "Fetching AWS Account ID..."
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - IMAGE_REPO_1="$ACCOUNT_ID.dkr.ecr.$CLUSTER_1_REGION.amazonaws.com/multi-region-demo"
-      - IMAGE_REPO_2="$ACCOUNT_ID.dkr.ecr.$CLUSTER_2_REGION.amazonaws.com/multi-region-demo"
+      - IMAGE_REPO_1=$ACCOUNT_ID.dkr.ecr.$CLUSTER_1_REGION.amazonaws.com/multi-region-demo
+      - IMAGE_REPO_2=$ACCOUNT_ID.dkr.ecr.$CLUSTER_2_REGION.amazonaws.com/multi-region-demo
 
       - echo "Logging into ECR for both regions..."
       - aws ecr get-login-password --region $CLUSTER_1_REGION | docker login --username AWS --password-stdin $IMAGE_REPO_1
@@ -56,3 +54,6 @@ phases:
       - sed "s|REPO_URI|$IMAGE_REPO_2|" demo-app/values.yaml > values-aps1.yaml
       - helm upgrade --install demo-app ./demo-app -f values-aps1.yaml --namespace default --wait
 
+artifacts:
+  files:
+    - '**/*'
