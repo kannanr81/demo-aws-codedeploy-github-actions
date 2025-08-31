@@ -20,7 +20,7 @@ jobs:
       - name: Configure AWS credentials (us-east-1)
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          role-to-assume: arn:aws:iam::645968351433:role/GitHubOIDCRole
+          role-to-assume: arn:aws:iam::851509662501:role/GitHubOIDCRole
           aws-region: us-east-1
 
       - name: Trigger CodePipeline (us-east-1)
