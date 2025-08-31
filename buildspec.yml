@@ -1,0 +1,58 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: latest
+    CLUSTER_1_NAME: eks-east
+    CLUSTER_1_REGION: us-east-1
+    CLUSTER_2_NAME: eks-south
+    CLUSTER_2_REGION: ap-south-1
+
+phases:
+  install:
+    runtime-versions:
+      docker: 20
+    commands:
+      - echo "Installing Helm..."
+      - curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      - chmod 700 get_helm.sh
+      - ./get_helm.sh
+
+  pre_build:
+    commands:
+      - echo "Fetching AWS Account ID..."
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - IMAGE_REPO_1="$ACCOUNT_ID.dkr.ecr.$CLUSTER_1_REGION.amazonaws.com/multi-region-demo"
+      - IMAGE_REPO_2="$ACCOUNT_ID.dkr.ecr.$CLUSTER_2_REGION.amazonaws.com/multi-region-demo"
+
+      - echo "Logging into ECR for both regions..."
+      - aws ecr get-login-password --region $CLUSTER_1_REGION | docker login --username AWS --password-stdin $IMAGE_REPO_1
+      - aws ecr get-login-password --region $CLUSTER_2_REGION | docker login --username AWS --password-stdin $IMAGE_REPO_2
+
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build -t $IMAGE_REPO_1:$IMAGE_TAG .
+      - docker tag $IMAGE_REPO_1:$IMAGE_TAG $IMAGE_REPO_2:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo "Pushing Docker images..."
+      - docker push $IMAGE_REPO_1:$IMAGE_TAG
+      - docker push $IMAGE_REPO_2:$IMAGE_TAG
+
+      - echo "Waiting for ECR replication..."
+      - sleep 10
+
+      - echo "Deploying to EKS Cluster 1 ($CLUSTER_1_NAME)..."
+      - aws eks update-kubeconfig --region $CLUSTER_1_REGION --name $CLUSTER_1_NAME
+      - kubectl get nodes || { echo 'Failed to connect to EKS Cluster 1'; exit 1; }
+      - sed "s|REPO_URI|$IMAGE_REPO_1|" demo-app/values.yaml > values-use1.yaml
+      - helm upgrade --install demo-app ./demo-app -f values-use1.yaml --namespace default --wait
+
+      - echo "Deploying to EKS Cluster 2 ($CLUSTER_2_NAME)..."
+      - aws eks update-kubeconfig --region $CLUSTER_2_REGION --name $CLUSTER_2_NAME
+      - kubectl get nodes || { echo 'Failed to connect to EKS Cluster 2'; exit 1; }
+      - sed "s|REPO_URI|$IMAGE_REPO_2|" demo-app/values.yaml > values-aps1.yaml
+      - helm upgrade --install demo-app ./demo-app -f values-aps1.yaml --namespace default --wait
+

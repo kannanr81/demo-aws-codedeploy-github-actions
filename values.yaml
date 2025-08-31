@@ -1,0 +1,10 @@
+namespace: default
+
+image:
+  repository: REPO_URI  # Replace with your actual ECR URI
+  tag: latest
+
+service:
+  type: LoadBalancer
+  port: 8080
+
